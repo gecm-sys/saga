@@ -34,9 +34,11 @@ LLM_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:gene
 DRY_RUN = env("DRY_RUN", "true").lower() != "false"
 LOG_TEXT = env("LOG_TEXT", "false").lower() == "true"
 BLACKLIST = {a.strip().lower() for a in env("BLACKLIST").split(",") if a.strip()}
-COMMUNITY = env("COMMUNITY")
-if not COMMUNITY:
+COMMUNITIES = [c.strip().lower() for c in env("COMMUNITY").split(",") if c.strip()]
+if not COMMUNITIES:
     raise SystemExit("COMMUNITY is not set")
+# Emojis only go to posts of these communities (empty = every community).
+EMOJI_COMMUNITIES = {c.strip().lower() for c in env("EMOJI_COMMUNITIES").split(",") if c.strip()}
 SORT = env("SORT", "trending").lower()  # trending | hot | created
 if SORT not in ("trending", "hot", "created"):
     SORT = "trending"
@@ -115,20 +117,22 @@ def save_state(f, state):
 
 
 # ---------- hive helpers ----------
+def post_community(p):
+    return (p.get("category") or p.get("community") or "").lower()
+
+
 def in_community(p):
-    return COMMUNITY in (p.get("category"), p.get("community"))
+    return post_community(p) in COMMUNITIES
 
 
-def recent_posts():
-    """Root posts of the community, newest/trending first, younger than MAX_AGE_HOURS."""
-    cutoff = now() - dt.timedelta(hours=MAX_AGE_HOURS)
+def community_posts(tag, cutoff):
     method = f"condenser_api.get_discussions_by_{SORT}"
     out, start = [], {}
     for _ in range(MAX_PAGES):
         try:
-            res = rpc(method, [{"tag": COMMUNITY, "limit": 20, **start}])
+            res = rpc(method, [{"tag": tag, "limit": 20, **start}])
         except Exception as e:
-            print("fetch stopped:", type(e).__name__)
+            print(f"fetch stopped ({tag}):", type(e).__name__)
             break
         if start:
             res = res[1:]
@@ -142,6 +146,19 @@ def recent_posts():
                 out.append(p)
         last = res[-1]
         start = {"start_author": last["author"], "start_permlink": last["permlink"]}
+    return out
+
+
+def recent_posts():
+    """Root posts of all configured communities, younger than MAX_AGE_HOURS."""
+    cutoff = now() - dt.timedelta(hours=MAX_AGE_HOURS)
+    out, seen = [], set()
+    for tag in COMMUNITIES:
+        for p in community_posts(tag, cutoff):
+            key = (p["author"], p["permlink"])
+            if key not in seen:
+                seen.add(key)
+                out.append(p)
     return out
 
 
@@ -294,8 +311,10 @@ def make_comment(post):
     return text
 
 
-def add_emoji(text):
+def add_emoji(text, post):
     """Sometimes end the comment with a flower (and occasionally a soft second) emoji."""
+    if EMOJI_COMMUNITIES and post_community(post) not in EMOJI_COMMUNITIES:
+        return text
     if random.random() > EMOJI_CHANCE or EMOJI_RE.search(text):
         return text
     picks = [random.choice(FLOWERS)]
@@ -400,7 +419,7 @@ def main():
         fails = 0
         if not text or is_generic(text, p) or too_similar(text, state["recent"]):
             continue
-        text = add_emoji(text)
+        text = add_emoji(text, p)
 
         if DRY_RUN:
             print(f"[dry run] would upvote ({UPVOTE_WEIGHT / 100:.0f}%) then comment -> "
