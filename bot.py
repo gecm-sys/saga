@@ -33,10 +33,10 @@ LLM_KEY = env("GEMINI_API_KEY")
 LLM_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
 DRY_RUN = env("DRY_RUN", "true").lower() != "false"
 LOG_TEXT = env("LOG_TEXT", "false").lower() == "true"
-# Community-official accounts (contest / announcement posts) are always skipped.
-BLACKLIST = {"ladiesofhive", "hive-124452"} | {
-    a.strip().lower() for a in env("BLACKLIST").split(",") if a.strip()}
-COMMUNITY = env("COMMUNITY", "hive-124452")  # Ladies of Hive
+BLACKLIST = {a.strip().lower() for a in env("BLACKLIST").split(",") if a.strip()}
+COMMUNITY = env("COMMUNITY")
+if not COMMUNITY:
+    raise SystemExit("COMMUNITY is not set")
 SORT = env("SORT", "trending").lower()  # trending | hot | created
 if SORT not in ("trending", "hot", "created"):
     SORT = "trending"
@@ -53,9 +53,8 @@ CHECK_AFTER_HOURS = 6
 SYSTEM = (env("COMMENT_RULES")
           or "Write one short, relevant comment for this blog post. Reply with exactly SKIP if you cannot.")
 SYSTEM += ("\n\nAdditional rules: always write the comment in English, even if the post is "
-           "written in another language. Use a warm, supportive tone, because this is a community of women sharing "
-           "personal stories. Do not use any emojis, they are added separately. Never assume "
-           "things about the author that the post does not say.")
+           "written in another language. Do not use any emojis, they are added separately. Never assume things about "
+           "the author that the post does not say.")
 
 FLOWERS = ["\U0001F338", "\U0001F337", "\U0001F33A", "\U0001F339", "\U0001F490",
            "\U0001F33C", "\U0001F33B", "\U0001FAB7"]          # 🌸🌷🌺🌹💐🌼🌻🪷
