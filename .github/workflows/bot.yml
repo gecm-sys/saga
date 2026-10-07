@@ -58,6 +58,7 @@ jobs:
           MAX_AGE_HOURS: ${{ vars.MAX_AGE_HOURS }}
           MAX_POSTS_PER_DAY: ${{ vars.MAX_POSTS_PER_DAY }}
           COMMUNITY: ${{ vars.COMMUNITY }}
+          SKIP_BENEFICIARY: ${{ vars.SKIP_BENEFICIARY }}
           EMOJI_COMMUNITIES: ${{ vars.EMOJI_COMMUNITIES }}
           SORT: ${{ vars.SORT }}
           MAX_PAGES: ${{ vars.MAX_PAGES }}
